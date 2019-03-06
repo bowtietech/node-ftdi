@@ -798,8 +798,9 @@ void FtdiDevice::ExtractDeviceSettings(Local<Object> options)
 
   if(hasBitSettings && options->Has(bitmask))
   {
-      deviceParams.bitMask = options->Get(bitmask)->ToInt32()->Int32Value();
-      hasBitSettings = true;
+    // deviceParams.bitMask = options->Get(bitmask)->ToInt32()->Int32Value();
+    deviceParams.bitMask = ToInt32(options->Get(bitmask))->Int32Value();
+    hasBitSettings = true;
   }
 
   deviceParams.hasBitSettings = hasBitSettings;

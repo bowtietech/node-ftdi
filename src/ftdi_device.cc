@@ -183,11 +183,15 @@ class ReadWorker : public Nan::AsyncWorker {
     {
       Local<Value> argv[2];
 
+      // Get the values from the RX Buffer
       Local<Object> slowBuffer = Nan::CopyBuffer((char*)baton->data, baton->length).ToLocalChecked();
+      
+
       Local<Object> globalObj = Nan::GetCurrentContext()->Global();
       Local<Function> bufferConstructor = Local<Function>::Cast(globalObj->Get(Nan::New<String>("Buffer").ToLocalChecked()));
       Handle<Value> constructorArgs[3] = { slowBuffer, Nan::New<Integer>(baton->length), Nan::New<Integer>(0) };
-      Local<Object> actualBuffer = bufferConstructor->NewInstance(3, constructorArgs);
+      Local<Object> actualBuffer = bufferConstructor->NewInstance(Nan::GetCurrentContext(), 3, constructorArgs).ToLocalChecked();
+
       argv[1] = actualBuffer;
 
       if(status != FT_OK)
@@ -767,15 +771,16 @@ void FtdiDevice::ExtractDeviceSettings(Local<Object> options)
 
   if(options->Has(baudrate))
   {
-    deviceParams.baudRate = options->Get(baudrate)->ToInt32()->Int32Value();
+
+    deviceParams.baudRate = options->Get(baudrate)->ToInt32(Nan::GetCurrentContext()).ToLocalChecked()->Value();
   }
   if(options->Has(databits))
   {
-    deviceParams.wordLength = GetWordLength(options->Get(databits)->ToInt32()->Int32Value());
+    deviceParams.wordLength = GetWordLength(options->Get(databits)->ToInt32(Nan::GetCurrentContext()).ToLocalChecked()->Value());
   }
   if(options->Has(stopbits))
   {
-    deviceParams.stopBits = GetStopBits(options->Get(stopbits)->ToInt32()->Int32Value());
+    deviceParams.stopBits = GetStopBits(options->Get(stopbits)->ToInt32(Nan::GetCurrentContext()).ToLocalChecked()->Value());
   }
   if(options->Has(parity))
   {

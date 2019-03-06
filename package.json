@@ -5,12 +5,14 @@
   "main": "index.js",
   "dependencies": {
     "bindings": "^1.2.1",
-    "nan": "^2.4.0"
+    "nan": "^2.12.1",
+    "node-gyp": "^3.8.0"
   },
   "gypfile": true,
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "node-gyp rebuild"
+    "postinstall": "node-gyp rebuild",
+    "compile": "node - gyp rebuild"
   },
   "repository": {
     "type": "git",

@@ -790,7 +790,7 @@ void FtdiDevice::ExtractDeviceSettings(Local<Object> options)
 
   if(options->Has(bitmode))
   {
-    int32_t arg = info[0]->ToInt32(Nan::GetCurrentContext()).ToLocalChecked()->Value();
+    // int32_t arg = info[0]->ToInt32(Nan::GetCurrentContext()).ToLocalChecked()->Value();
     // deviceParams.bitMode = options->Get(bitmode)->ToInt32()->Int32Value();
     deviceParams.bitMode = options->Get(bitmode)->ToInt32(Nan::GetCurrentContext()).ToLocalChecked()->Value();
     hasBitSettings = true;
@@ -800,7 +800,8 @@ void FtdiDevice::ExtractDeviceSettings(Local<Object> options)
 
   if(hasBitSettings && options->Has(bitmask))
   {
-    deviceParams.bitMask = options->Get(bitmask)->ToInt32()->Int32Value();
+    // deviceParams.bitMask = options->Get(bitmask)->ToInt32()->Int32Value();
+    deviceParams.bitMask = options->Get(bitmask)->ToInt32(Nan::GetCurrentContext()).ToLocalChecked()->Value();
     // deviceParams.bitMask = ToInt32(options->Get(bitmask))->Int32Value();
     hasBitSettings = true;
   }

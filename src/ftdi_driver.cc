@@ -71,7 +71,8 @@ bool DeviceMatchesFilterCriteria(FT_DEVICE_LIST_INFO_NODE *devInfo, int filterVi
 
 DeviceListBaton* FindAllAsync(int vid, int pid)
 {
-  DeviceListBaton* listBaton = new DeviceListBaton();
+  DeviceListBaton *listBaton = new DeviceListBaton();
+
   FT_STATUS ftStatus;
   DWORD numDevs = 0;
 
@@ -82,7 +83,7 @@ DeviceListBaton* FindAllAsync(int vid, int pid)
   if(vid != 0 && pid != 0)
   {
     uv_mutex_lock(&libraryMutex);
-    ftStatus = FT_SetVIDPID(vid, pid);
+    // ftStatus = FT_SetVIDPID(vid, pid);
     uv_mutex_unlock(&libraryMutex);
   }
 #endif
@@ -94,28 +95,77 @@ DeviceListBaton* FindAllAsync(int vid, int pid)
   {
     if (numDevs > 0)
     {
-      // allocate storage for list based on numDevs
-      listBaton->devInfo =  new FT_DEVICE_LIST_INFO_NODE[numDevs];
-      memset(listBaton->devInfo, 0, sizeof(FT_DEVICE_LIST_INFO_NODE) * numDevs);
 
-      // get the device information list
-      uv_mutex_lock(&libraryMutex);
-      ftStatus = FT_GetDeviceInfoList(listBaton->devInfo, &numDevs);
-      uv_mutex_unlock(&libraryMutex);
+      FT_HANDLE ftHandleTemp;
+      DWORD Flags;
+      DWORD ID;
+      DWORD Type;
+      DWORD LocId;
+      char SerialNumber[16];
+      char Description[64];
 
-      // fallback for wrong info in several cases... when connected multiple devices and unplug one...
-      for(DWORD i = 0; i < numDevs; i++)
-      {
-        uv_mutex_lock(&libraryMutex);
-        FT_ListDevices((PVOID)i, listBaton->devInfo[i].SerialNumber, FT_LIST_BY_INDEX | FT_OPEN_BY_SERIAL_NUMBER);
-        FT_ListDevices((PVOID)i, listBaton->devInfo[i].Description, FT_LIST_BY_INDEX | FT_OPEN_BY_DESCRIPTION);
-        FT_ListDevices((PVOID)i, &listBaton->devInfo[i].LocId, FT_LIST_BY_INDEX | FT_OPEN_BY_LOCATION);
-        uv_mutex_unlock(&libraryMutex);
-      }
-    }
+        // get information for device 0
+        ftStatus = FT_GetDeviceInfoDetail(0, &Flags, &Type, &ID, &LocId, SerialNumber,
+                                          Description, &ftHandleTemp);
+        if (ftStatus == FT_OK)
+        {
+          printf("Dev 0:\n");
+          printf(" Flags=0x%x\n", Flags);
+          printf(" Type=0x%x\n", Type);
+          printf(" ID=0x%x\n", ID);
+          printf(" LocId=0x%x\n", LocId);
+          printf(" SerialNumber=%s\n", SerialNumber);
+          printf(" Description=%s\n", Description);
+          printf(" ftHandle=0x%x\n", ftHandleTemp);
+        }
+
+        FT_DEVICE_LIST_INFO_NODE *devInfo;
+
+        devInfo = (FT_DEVICE_LIST_INFO_NODE *)malloc(sizeof(FT_DEVICE_LIST_INFO_NODE) * numDevs);
+        // get the device information list
+        ftStatus = FT_GetDeviceInfoList(devInfo, &numDevs);
+        if (ftStatus == FT_OK)
+        {
+          for (int i = 0; i < numDevs; i++)
+          {
+            printf("Dev %d:\n", i);
+            printf(" Flags=0x%x\n", devInfo[i].Flags);
+            printf(" Type=0x%x\n", devInfo[i].Type);
+            printf(" ID=0x%x\n", devInfo[i].ID);
+            printf(" LocId=0x%x\n", devInfo[i].LocId);
+            printf(" SerialNumber=%s\n", devInfo[i].SerialNumber);
+            printf(" Description=%s\n", devInfo[i].Description);
+            printf(" ftHandle=0x%x\n", devInfo[i].ftHandle);
+            // printf(" pid=0x%x\n", devInfo[i].pid);
+            // printf(" vid=0x%x\n", devInfo[i].vid);
+          }
+          }
+
+          // allocate storage for list based on numDevs
+          listBaton->devInfo = new FT_DEVICE_LIST_INFO_NODE[numDevs];
+
+          memset(listBaton->devInfo, 0, sizeof(FT_DEVICE_LIST_INFO_NODE) * numDevs);
+
+          // get the device information list
+          uv_mutex_lock(&libraryMutex);
+          ftStatus = FT_GetDeviceInfoList(listBaton->devInfo, &numDevs);
+          uv_mutex_unlock(&libraryMutex);
+
+          // fallback for wrong info in several cases... when connected multiple devices and unplug one...
+          for (DWORD i = 0; i < numDevs; i++)
+          {
+            uv_mutex_lock(&libraryMutex);
+            FT_ListDevices((PVOID)i, listBaton->devInfo[i].SerialNumber, FT_LIST_BY_INDEX | FT_OPEN_BY_SERIAL_NUMBER);
+            FT_ListDevices((PVOID)i, listBaton->devInfo[i].Description, FT_LIST_BY_INDEX | FT_OPEN_BY_DESCRIPTION);
+            FT_ListDevices((PVOID)i, &listBaton->devInfo[i].LocId, FT_LIST_BY_INDEX | FT_OPEN_BY_LOCATION);
+            uv_mutex_unlock(&libraryMutex);
+          }
+        }
   }
   uv_mutex_unlock(&vidPidMutex);
 
+  listBaton->vid = vid;
+  listBaton->pid = pid;
   listBaton->listLength = numDevs;
   listBaton->status = ftStatus;
   return listBaton;
@@ -221,7 +271,6 @@ NAN_METHOD(FindAll) {
   {
     return Nan::ThrowError("Third argument must be a function");
   }
-
   callback = new Nan::Callback(info[2].As<v8::Function>());
 
   Nan::AsyncQueueWorker(new FindAllWorker(callback, vid, pid));

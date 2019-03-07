@@ -25,6 +25,7 @@ var bitmodes = {
   'single': 0x40
 };
 
+
 /**
  * FtdiDevice represents your physical device.
  * On error 'error' will be emitted.

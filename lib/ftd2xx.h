@@ -1,6 +1,6 @@
 /*++
 
-Copyright © 2001-2011 Future Technology Devices International Limited
+Copyright ï¿½ 2001-2011 Future Technology Devices International Limited
 
 THIS SOFTWARE IS PROVIDED BY FUTURE TECHNOLOGY DEVICES INTERNATIONAL LIMITED "AS IS"
 AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -1240,7 +1240,6 @@ extern "C" {
 		FT_FLAGS_OPENED = 1,
 		FT_FLAGS_HISPEED = 2
 	};
-
 
 	FTD2XX_API
 		FT_STATUS WINAPI FT_CreateDeviceInfoList(

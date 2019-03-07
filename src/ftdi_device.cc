@@ -181,7 +181,7 @@ class ReadWorker : public Nan::AsyncWorker {
     // Execute the callback in case we have one and we have read some data
     if(status != FT_OK || (baton->length != 0))
     {
-      Local<Value> argv[2];
+      Local<Value> argv[3];
 
       // Get the values from the RX Buffer
       Local<Object> slowBuffer = Nan::CopyBuffer((char*)baton->data, baton->length).ToLocalChecked();
@@ -192,6 +192,7 @@ class ReadWorker : public Nan::AsyncWorker {
       Handle<Value> constructorArgs[3] = { slowBuffer, Nan::New<Integer>(baton->length), Nan::New<Integer>(0) };
       Local<Object> actualBuffer = bufferConstructor->NewInstance(Nan::GetCurrentContext(), 3, constructorArgs).ToLocalChecked();
 
+      argv[2] = Local<Value>(Nan::New<String>("My SPI").ToLocalChecked());
       argv[1] = actualBuffer;
 
       if(status != FT_OK)
@@ -200,10 +201,11 @@ class ReadWorker : public Nan::AsyncWorker {
       }
       else
       {
-        argv[0] = Local<Value>(Nan::Undefined());
+        // argv[0] = Local<Value>(Nan::Undefined());
+        argv[0] = Local<Value>(Nan::New<String>("No Errors").ToLocalChecked());
       }
 
-      callback->Call(2, argv);
+      callback->Call(3, argv);
     }
 
     if(baton->length != 0)

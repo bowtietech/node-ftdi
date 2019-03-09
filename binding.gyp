@@ -28,13 +28,15 @@
                 {
                   'libraries':
                   [
-                   '-l<(module_root_dir)/lib/i386/ftd2xx.lib'
+                   '-l<(module_root_dir)/lib/i386/ftd2xx.lib',
+                   '-l<(module_root_dir)/lib/MPSSE/libMPSSE.lib'
                   ]
                 }
               ],
               ["target_arch=='x64'", {
                 'libraries': [
-                   '-l<(module_root_dir)/lib/amd64/ftd2xx.lib'
+                   '-l<(module_root_dir)/lib/amd64/ftd2xx.lib',
+                   '-l<(module_root_dir)/lib/MPSSE/libMPSSE.lib'
                 ]
               }]
             ]
@@ -44,14 +46,16 @@
           {
             'include_dirs+': [
               '/usr/local/include',
-              '/usr/local/include/libftd2xx/'
+              'lib/MPSSE/',
+              # '/usr/local/include/libftd2xx/'
             ],
             'ldflags': [
               '-Wl,-Map=output.map',
             ],
             'link_settings': {
               'libraries': [
-                '-lftd2xx'
+                '-lftd2xx',
+                '<(module_root_dir)/lib/MPSSE/libMPSSE.so'
               ]
             }
           }

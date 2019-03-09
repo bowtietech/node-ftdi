@@ -4,6 +4,8 @@
 #include <v8.h>
 #include <node.h>
 #include <ftd2xx.h>
+/* Include libMPSSE header */
+// #include <libMPSSE_spi.h>
 
 #include "nan.h"
 

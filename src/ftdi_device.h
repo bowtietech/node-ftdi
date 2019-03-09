@@ -6,6 +6,9 @@
 #include <node_object_wrap.h>
 #include <ftd2xx.h>
 
+/* Include libMPSSE header */
+// #include <libMPSSE_spi.h>
+
 #include "nan.h"
 
 using namespace v8;

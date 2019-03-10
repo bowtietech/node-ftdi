@@ -197,7 +197,7 @@ class ReadWorker : public Nan::AsyncWorker {
 
       Local<Object> globalObj = Nan::GetCurrentContext()->Global();
       Local<Function> bufferConstructor = Local<Function>::Cast(globalObj->Get(Nan::New<String>("Buffer").ToLocalChecked()));
-      Handle<Value> constructorArgs[3] = { slowBuffer, Nan::New<Integer>(baton->length), Nan::New<Integer>(0) };
+      Handle<Value> constructorArgs[3] = { slowBuffer, Nan::New<Integer>((uint32_t)baton->length), Nan::New<Integer>((uint32_t)0) };
       Local<Object> actualBuffer = bufferConstructor->NewInstance(Nan::GetCurrentContext(), 3, constructorArgs).ToLocalChecked();
 
       argv[2] = Local<Value>(Nan::New<String>("My SPI").ToLocalChecked());

@@ -7,16 +7,24 @@
 #include <uv.h>
 #include <node_buffer.h>
 
+// #ifndef WIN32
+    // #include <unistd.h>
+    // #include <sys/time.h>
+// #else
+    // #include <windows.h>
+// #endif
+
+// #ifndef _WINDOWS_H
+// #define _WINDOWS_H
+// #include <windows.h>
+// #endif
+
+
 #include "ftdi_constants.h"
 #include "ftdi_device.h"
 #include "ftdi_driver.h"
 
-#ifndef WIN32
-    #include <unistd.h>
-    #include <sys/time.h>
-#else
-    #include <windows.h>
-#endif
+
 
 using namespace std;
 using namespace v8;

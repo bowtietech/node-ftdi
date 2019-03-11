@@ -20,6 +20,10 @@
             [
               'lib/'
             ],
+            'libraries': [
+                   '../lib/amd64/ftd2xx.lib',
+                  #  '-l<(module_root_dir)/lib/MPSSE/libMPSSE.lib'
+                ],
             'link_settings':
             {
               "conditions" :
@@ -35,7 +39,7 @@
               ],
               ["target_arch=='x64'", {
                 'libraries': [
-                   '-l<(module_root_dir)/lib/amd64/ftd2xx.lib',
+                   '../lib/amd64/ftd2xx.lib',
                   #  '-l<(module_root_dir)/lib/MPSSE/libMPSSE.lib'
                 ]
               }]

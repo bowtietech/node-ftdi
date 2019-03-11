@@ -33,5 +33,11 @@
   "bugs": {
     "url": "https://github.com/thomaschaaf/node-ftdi/issues"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "build": {
+    "appId": "com.bowtietechnology.com",
+    "mac": {
+      "category": "devtools"
+    }
+  }
 }

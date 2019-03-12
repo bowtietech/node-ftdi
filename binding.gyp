@@ -10,7 +10,9 @@
       'include_dirs+':
       [
         'src/',
-         "<!(node -e \"require('nan')\")"
+         "<!(node -e \"require('nan')\")",
+         'lib/',
+         '/lib/amd64/'
       ],
       'conditions':
       [

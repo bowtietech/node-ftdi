@@ -18,6 +18,18 @@
       [
         ['OS == "win"',
           {
+                     "copies":
+         [
+            {
+               'destination': '<(module_root_dir)/build/Release',
+               'files': ['<(module_root_dir)/lib/amd64/ftd2xx.dll']
+            }
+         ],
+            "variables": {
+              "dll_files": [
+                "<(module_root_dir)/lib/amd64/ftd2xx.dll"
+              ]
+            },
             'include_dirs+':
             [
               'lib/'

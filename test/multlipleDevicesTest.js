@@ -3,7 +3,7 @@ var ftdi = require('../index');
 var foundDevs = [];
 
 setInterval(function() {
-  ftdi.find(0x27f4, 0x0203, function(err, devices) {
+  ftdi.find(0x6014, 0x0403, function(err, devices) {
     foundDevs = devices;
     console.log(devices.length);
     console.log(devices);
@@ -11,10 +11,10 @@ setInterval(function() {
 }, 150);
 
 setTimeout(function() {
-  var device1 = new ftdi.FtdiDevice({ serialNumber: 'FTVTIXI5', vendorId: 0x27f4, productId: 0x0203 });
+  var device1 = new ftdi.FtdiDevice({ serialNumber: 'FTQAVXO6', vendorId: 0x6014, productId: 0x0403 });
 
   device1.on('data', function(data) {
-    // console.log(arguments);
+    console.log(arguments);
   });
 
   device1.open({

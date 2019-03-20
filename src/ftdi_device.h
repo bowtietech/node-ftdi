@@ -82,11 +82,15 @@ class FtdiDevice : public Nan::ObjectWrap
     static NAN_METHOD(Open);
     static NAN_METHOD(Write);
     static NAN_METHOD(Close);
+    static NAN_METHOD(SetBitMode);
+    static NAN_METHOD(InitMpsse);
 
     static FT_STATUS OpenAsync(FtdiDevice* device, Nan::Callback *callback_read);
     static FT_STATUS ReadDataAsync(FtdiDevice* device, ReadBaton_t* baton);
-    static FT_STATUS WriteAsync(FtdiDevice* device, WriteBaton_t* baton);
-    static FT_STATUS CloseAsync(FtdiDevice* device);
+    static FT_STATUS WriteAsync(FtdiDevice *device, WriteBaton_t *baton);
+    static FT_STATUS InitMpsseAsync(FtdiDevice *device, WriteBaton_t *baton);
+    static FT_STATUS BitModeAsync(FtdiDevice *device, WriteBaton_t *baton);
+    static FT_STATUS CloseAsync(FtdiDevice *device);
 
     void ExtractDeviceSettings(Local<v8::Object> options);
     FT_STATUS SetDeviceSettings();

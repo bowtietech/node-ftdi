@@ -38,7 +38,8 @@ using namespace ftdi_device;
 #define JS_WRITE_FUNCTION           "write"
 #define JS_OPEN_FUNCTION            "open"
 #define JS_CLOSE_FUNCTION           "close"
-
+#define JS_BIT_MODE_FUNCTION        "bitMode"
+#define JS_INIT_MPSSE_FUNCTION      "initMpsse"
 
 /**********************************
  * Local Helper Functions protoypes
@@ -419,8 +420,12 @@ NAN_METHOD(FtdiDevice::Open) {
 FT_STATUS FtdiDevice::OpenAsync(FtdiDevice* device, Nan::Callback *callback_read)
 {
   FT_STATUS ftStatus;
+  DWORD dwNumBytesToRead = 0; // Number of bytes available to read
+  DWORD dwNumBytesRead = 0;   // Count of actual bytes read - used with FT_Read
+  BYTE byInputBuffer[8];      // Buffer to hold data read from the FT2232H
 
   ftStatus = device->OpenDevice();
+
   if (ftStatus != FT_OK)
   {
     fprintf(stderr, "Can't open ftdi device: %s\n", error_strings[ftStatus]);
@@ -430,16 +435,37 @@ FT_STATUS FtdiDevice::OpenAsync(FtdiDevice* device, Nan::Callback *callback_read
     ftStatus = device->SetDeviceSettings();
     if (ftStatus != FT_OK)
     {
-      fprintf(stderr, "Can't Set DeviceSettings: %s\n", error_strings[ftStatus]);
+      fprintf(stderr, "Can't Set Device Settings: %s\n", error_strings[ftStatus]);
+    }else{
+      // Init MPSSE
+      ftStatus |= FT_ResetDevice(device->ftHandle);
+      ftStatus |= FT_GetQueueStatus(device->ftHandle, &dwNumBytesToRead);
+      if ((ftStatus == FT_OK) && (dwNumBytesToRead > 0)){
+        FT_Read(device->ftHandle, &byInputBuffer, dwNumBytesToRead, &dwNumBytesRead);
+      }
+      ftStatus |= FT_SetUSBParameters(device->ftHandle, 65536, 65535);
+      ftStatus |= FT_SetChars(device->ftHandle, false, 0, false, 0);
+      ftStatus |= FT_SetTimeouts(device->ftHandle, 0, 5000);
+      ftStatus |= FT_SetLatencyTimer(device->ftHandle, 1);
+      ftStatus |= FT_SetFlowControl(device->ftHandle, FT_FLOW_RTS_CTS, 0x00, 0x00);
+      ftStatus |= FT_SetBitMode(device->ftHandle, 0x0, 0x00);
+      ftStatus |= FT_SetBitMode(device->ftHandle, 0x0, 0x02);
+      printf("\nftStatus: %d\n", ftStatus);
+      if (ftStatus != FT_OK)
+      {
+        printf("Error in initializing the MPSSE %d\n", ftStatus);
+        FT_Close(device->ftHandle);
+        return 1; // Exit with error
+      }
     }
   }
-
   return ftStatus;
 }
 
 FT_STATUS FtdiDevice::OpenDevice()
 {
     FT_STATUS status = FT_OK;
+    printf("%d\n", status);
 
     // For open by Index case
     if(connectParams.connectType == ConnectType_ByIndex)
@@ -455,8 +481,10 @@ FT_STATUS FtdiDevice::OpenDevice()
             status = FT_Open(connectParams.connectId, &ftHandle);
         }
         uv_mutex_unlock(&libraryMutex);
+        printf("ftHandle: %i", ftHandle);
         return status;
     }
+    
     // other cases
     else
     {
@@ -510,12 +538,276 @@ FT_STATUS FtdiDevice::OpenDevice()
         }
         uv_mutex_unlock(&libraryMutex);
         uv_mutex_unlock(&vidPidMutex);
+
+        printf("ftHandle: %i", ftHandle);
         return status;
     }
 
     return FT_INVALID_PARAMETER;
 }
 
+/*****************************
+ * BIT_MODE Section
+ *****************************/
+class BitModeWorker : public Nan::AsyncWorker
+{
+public:
+  BitModeWorker(Nan::Callback *callback, FtdiDevice *device, WriteBaton_t *baton)
+      : Nan::AsyncWorker(callback), device(device), baton(baton) {}
+  ~BitModeWorker() {}
+
+  // Executed inside the worker-thread.
+  // It is not safe to access V8, or V8 data structures
+  // here, so everything we need for input and output
+  // should go on `this`.
+  void Execute()
+  {
+    status = FtdiDevice::BitModeAsync(device, baton);
+  }
+
+  // Executed when the async work is complete
+  // this function will be run inside the main event loop
+  // so it is safe to use V8 again
+  void HandleOKCallback()
+  {
+    Nan::HandleScope scope;
+
+    if (callback != NULL)
+    {
+      Local<Value> argv[1];
+      if (status != FT_OK)
+      {
+        argv[0] = Nan::New<String>(GetStatusString(status)).ToLocalChecked();
+      }
+      else
+      {
+        argv[0] = Local<Value>(Nan::Undefined());
+      }
+
+      callback->Call(1, argv);
+    }
+
+    delete baton->data;
+    delete baton;
+  };
+
+private:
+  FT_STATUS status;
+  FtdiDevice *device;
+  WriteBaton_t *baton;
+};
+
+NAN_METHOD(FtdiDevice::SetBitMode)
+{
+  Nan::HandleScope scope;
+
+  Nan::Callback *callback = NULL;
+
+  // buffer
+  if (!info[0]->IsObject() || !Buffer::HasInstance(info[0]))
+  {
+    return Nan::ThrowError("First argument must be a buffer");
+  }
+  Local<Object> buffer = info[0]->ToObject();
+
+  // Obtain Device Object
+  FtdiDevice *device = Nan::ObjectWrap::Unwrap<FtdiDevice>(info.This());
+  if (device == NULL)
+  {
+    return Nan::ThrowError("No FtdiDevice object found in Java Script object");
+  }
+
+  printf(">>> Set Bit Modes");
+
+  Local<Value> writeCallback;
+  // options
+  if (info.Length() > 1 && info[1]->IsFunction())
+  {
+    writeCallback = info[1];
+    callback = new Nan::Callback(writeCallback.As<v8::Function>());
+  }
+
+  WriteBaton_t *baton = new WriteBaton_t();
+  baton->length = (DWORD)Buffer::Length(buffer);
+  baton->data = new uint8_t[baton->length];
+  memcpy(baton->data, Buffer::Data(buffer), baton->length);
+
+  Nan::AsyncQueueWorker(new BitModeWorker(callback, device, baton));
+}
+
+FT_STATUS FtdiDevice::BitModeAsync(FtdiDevice *device, WriteBaton_t *baton)
+{
+  FT_STATUS ftStatus;
+  DWORD bytesWritten;
+  printf("Data: %x %x %i", baton->data[0], baton->data[1], device->ftHandle);
+  uv_mutex_lock(&libraryMutex);
+  ftStatus = FT_SetBitMode(device->ftHandle, baton->data[0], baton->data[1]);
+  uv_mutex_unlock(&libraryMutex);
+
+  return ftStatus;
+}
+
+/*****************************
+ * MPSSE Section
+ *****************************/
+class MpsseWorker : public Nan::AsyncWorker
+{
+public:
+  MpsseWorker(Nan::Callback *callback, FtdiDevice *device, WriteBaton_t *baton)
+      : Nan::AsyncWorker(callback), device(device), baton(baton) {}
+  ~MpsseWorker() {}
+
+  // Executed inside the worker-thread.
+  // It is not safe to access V8, or V8 data structures
+  // here, so everything we need for input and output
+  // should go on `this`.
+  void Execute()
+  {
+    status = FtdiDevice::InitMpsseAsync(device, baton);
+  }
+
+  // Executed when the async work is complete
+  // this function will be run inside the main event loop
+  // so it is safe to use V8 again
+  void HandleOKCallback()
+  {
+    Nan::HandleScope scope;
+
+    if (callback != NULL)
+    {
+      Local<Value> argv[1];
+      if (status != FT_OK)
+      {
+        argv[0] = Nan::New<String>(GetStatusString(status)).ToLocalChecked();
+      }
+      else
+      {
+        argv[0] = Local<Value>(Nan::Undefined());
+      }
+
+      callback->Call(1, argv);
+    }
+
+    delete baton->data;
+    delete baton;
+  };
+
+private:
+  FT_STATUS status;
+  FtdiDevice *device;
+  WriteBaton_t *baton;
+};
+
+NAN_METHOD(FtdiDevice::InitMpsse)
+{
+  Nan::HandleScope scope;
+
+  Nan::Callback *callback = NULL;
+
+  // buffer
+  if (!info[0]->IsObject() || !Buffer::HasInstance(info[0]))
+  {
+    return Nan::ThrowError("First argument must be a buffer");
+  }
+  Local<Object> buffer = info[0]->ToObject();
+
+  // Obtain Device Object
+  FtdiDevice *device = Nan::ObjectWrap::Unwrap<FtdiDevice>(info.This());
+  if (device == NULL)
+  {
+    return Nan::ThrowError("No FtdiDevice object found in Java Script object");
+  }
+
+  printf(">>> Init MPSSE");
+
+  Local<Value> writeCallback;
+  // options
+  if (info.Length() > 1 && info[1]->IsFunction())
+  {
+    writeCallback = info[1];
+    callback = new Nan::Callback(writeCallback.As<v8::Function>());
+  }
+
+  WriteBaton_t *baton = new WriteBaton_t();
+  baton->length = (DWORD)Buffer::Length(buffer);
+  baton->data = new uint8_t[baton->length];
+  memcpy(baton->data, Buffer::Data(buffer), baton->length);
+
+  Nan::AsyncQueueWorker(new MpsseWorker(callback, device, baton));
+}
+
+
+
+FT_STATUS FtdiDevice::InitMpsseAsync(FtdiDevice *device, WriteBaton_t *baton)
+{
+  FT_STATUS ftStatus;
+  DWORD bytesWritten;
+
+  DWORD dwNumDevs;               // The number of devices
+  unsigned int uiDevIndex = 0xF; // The device in the list that we'll use
+  BYTE byOutputBuffer[8];        // Buffer to hold MPSSE commands and data
+  // to be sent to the FT2232H
+  BYTE byInputBuffer[8];      // Buffer to hold data read from the FT2232H
+  DWORD dwCount = 0;          // General loop index
+  DWORD dwNumBytesToSend = 0; // Index to the output buffer
+  DWORD dwNumBytesSent = 0;   // Count of actual bytes sent - used with FT_Write
+  DWORD dwNumBytesToRead = 0; // Number of bytes available to read
+  // in the driver's input buffer
+  DWORD dwNumBytesRead = 0;      // Count of actual bytes read - used with FT_Read
+  DWORD dwClockDivisor = 0x05DB; // Value of clock divisor, SCL Frequency
+
+  // printf("Data: %x %x %i", baton->data[0], baton->data[1], device->ftHandle);
+  // uv_mutex_lock(&libraryMutex);
+  // ftStatus = FT_SetBitMode(device->ftHandle, baton->data[0], baton->data[1]);
+
+  // ftStatus = FT_Write(device->ftHandle, baton->data, baton->length, &bytesWritten);
+  
+  printf("\nConfiguring port for MPSSE use...\n");
+
+  ftStatus |= FT_ResetDevice(device->ftHandle);
+  printf("%d\n", ftStatus);
+
+  //Reset USB device
+  //Purge USB receive buffer first by reading out all old data from FT2232H receive buffer
+  ftStatus |= FT_GetQueueStatus(device->ftHandle, &dwNumBytesToRead);
+  printf("%d\n", ftStatus);
+// Get the number of bytes in the FT2232H
+  // receive buffer
+  if ((ftStatus == FT_OK) && (dwNumBytesToRead > 0))
+    FT_Read(device->ftHandle, &byInputBuffer, dwNumBytesToRead, &dwNumBytesRead);
+  //Read out the data from FT2232H receive buffer
+  ftStatus |= FT_SetUSBParameters(device->ftHandle, 65536, 65535);
+  printf("%d\n", ftStatus);
+  //Set USB request transfer sizes to 64K
+  ftStatus |= FT_SetChars(device->ftHandle, false, 0, false, 0);
+  printf("%d\n", ftStatus);
+  //Disable event and error characters
+  ftStatus |= FT_SetTimeouts(device->ftHandle, 0, 5000);
+  printf("%d\n", ftStatus);
+  //Sets the read and write timeouts in milliseconds
+  ftStatus |= FT_SetLatencyTimer(device->ftHandle, 1);
+  printf("%d\n", ftStatus);
+  //Set the latency timer to 1mS (default is 16mS)
+  ftStatus |= FT_SetFlowControl(device->ftHandle, FT_FLOW_RTS_CTS, 0x00, 0x00);
+  printf("%d\n", ftStatus);
+  //Turn on flow control to synchronize IN requests
+  ftStatus |= FT_SetBitMode(device->ftHandle, 0x0, 0x00);
+  printf("%d\n", ftStatus);
+  //Reset controller
+  ftStatus |= FT_SetBitMode(device->ftHandle, 0x0, 0x02);
+  printf("%d\n", ftStatus);
+  //Enable MPSSE mode
+  if (ftStatus != FT_OK)
+  {
+    printf("Error in initializing the MPSSE %d\n", ftStatus);
+    FT_Close(device->ftHandle);
+    return 1; // Exit with error
+  }
+
+  // uv_mutex_unlock(&libraryMutex);
+
+  return ftStatus;
+}
 
 /*****************************
  * WRITE Section
@@ -565,243 +857,249 @@ class WriteWorker : public Nan::AsyncWorker {
   WriteBaton_t* baton;
 };
 
-NAN_METHOD(FtdiDevice::Write) {
-  Nan::HandleScope scope;
 
-  Nan::Callback *callback = NULL;
-
-  // buffer
-  if(!info[0]->IsObject() || !Buffer::HasInstance(info[0]))
+  NAN_METHOD(FtdiDevice::Write)
   {
-    return Nan::ThrowError("First argument must be a buffer");
-  }
-  Local<Object> buffer = info[0]->ToObject();
-
-  // Obtain Device Object
-  FtdiDevice* device = Nan::ObjectWrap::Unwrap<FtdiDevice>(info.This());
-  if(device == NULL)
-  {
-    return Nan::ThrowError("No FtdiDevice object found in Java Script object");
-  }
-
-  Local<Value> writeCallback;
-  // options
-  if(info.Length() > 1 && info[1]->IsFunction())
-  {
-    writeCallback = info[1];
-    callback = new Nan::Callback(writeCallback.As<v8::Function>());
-  }
-
-  WriteBaton_t* baton = new WriteBaton_t();
-  baton->length = (DWORD)Buffer::Length(buffer);
-  baton->data = new uint8_t[baton->length];
-  memcpy(baton->data, Buffer::Data(buffer), baton->length);
-
-  Nan::AsyncQueueWorker(new WriteWorker(callback, device, baton));
-
-  return;
-}
-
-FT_STATUS FtdiDevice::WriteAsync(FtdiDevice* device, WriteBaton_t* baton)
-{
-  FT_STATUS ftStatus;
-  DWORD bytesWritten;
-
-  uv_mutex_lock(&libraryMutex);
-  ftStatus = FT_Write(device->ftHandle, baton->data, baton->length, &bytesWritten);
-  uv_mutex_unlock(&libraryMutex);
-
-  return ftStatus;
-}
-
-/*****************************
- * CLOSE Section
- *****************************/
-class CloseWorker : public Nan::AsyncWorker {
- public:
-  CloseWorker(Nan::Callback *callback, FtdiDevice* device)
-    : Nan::AsyncWorker(callback), device(device) {}
-  ~CloseWorker() {}
-
-  // Executed inside the worker-thread.
-  // It is not safe to access V8, or V8 data structures
-  // here, so everything we need for input and output
-  // should go on `this`.
-  void Execute () {
-    status = FtdiDevice::CloseAsync(device);
-  }
-
-  // Executed when the async work is complete
-  // this function will be run inside the main event loop
-  // so it is safe to use V8 again
-  void HandleOKCallback () {
     Nan::HandleScope scope;
 
-    device->deviceState = DeviceState_Idle;
+    Nan::Callback *callback = NULL;
 
-    if(callback != NULL)
+    // buffer
+    if (!info[0]->IsObject() || !Buffer::HasInstance(info[0]))
     {
-      Local<Value> argv[1];
-      if(status != FT_OK)
-      {
-        argv[0] = Nan::New<String>(GetStatusString(status)).ToLocalChecked();
-      }
-      else
-      {
-        argv[0] = Local<Value>(Nan::Undefined());
-      }
-
-      callback->Call(1, argv);
+      return Nan::ThrowError("First argument must be a buffer");
     }
+    Local<Object> buffer = info[0]->ToObject();
+
+    // Obtain Device Object
+    FtdiDevice *device = Nan::ObjectWrap::Unwrap<FtdiDevice>(info.This());
+    if (device == NULL)
+    {
+      return Nan::ThrowError("No FtdiDevice object found in Java Script object");
+    }
+
+    Local<Value> writeCallback;
+    // options
+    if (info.Length() > 1 && info[1]->IsFunction())
+    {
+      writeCallback = info[1];
+      callback = new Nan::Callback(writeCallback.As<v8::Function>());
+    }
+
+    WriteBaton_t *baton = new WriteBaton_t();
+    baton->length = (DWORD)Buffer::Length(buffer);
+    baton->data = new uint8_t[baton->length];
+    memcpy(baton->data, Buffer::Data(buffer), baton->length);
+
+    Nan::AsyncQueueWorker(new WriteWorker(callback, device, baton));
+
+    return;
+  }
+
+  FT_STATUS FtdiDevice::WriteAsync(FtdiDevice * device, WriteBaton_t * baton)
+  {
+    FT_STATUS ftStatus;
+    DWORD bytesWritten;
+
+    uv_mutex_lock(&libraryMutex);
+    ftStatus = FT_Write(device->ftHandle, baton->data, baton->length, &bytesWritten);
+    uv_mutex_unlock(&libraryMutex);
+
+    return ftStatus;
+  }
+
+  /*****************************
+ * CLOSE Section
+ *****************************/
+  class CloseWorker : public Nan::AsyncWorker
+  {
+  public:
+    CloseWorker(Nan::Callback *callback, FtdiDevice *device)
+        : Nan::AsyncWorker(callback), device(device) {}
+    ~CloseWorker() {}
+
+    // Executed inside the worker-thread.
+    // It is not safe to access V8, or V8 data structures
+    // here, so everything we need for input and output
+    // should go on `this`.
+    void Execute()
+    {
+      status = FtdiDevice::CloseAsync(device);
+    }
+
+    // Executed when the async work is complete
+    // this function will be run inside the main event loop
+    // so it is safe to use V8 again
+    void HandleOKCallback()
+    {
+      Nan::HandleScope scope;
+
+      device->deviceState = DeviceState_Idle;
+
+      if (callback != NULL)
+      {
+        Local<Value> argv[1];
+        if (status != FT_OK)
+        {
+          argv[0] = Nan::New<String>(GetStatusString(status)).ToLocalChecked();
+        }
+        else
+        {
+          argv[0] = Local<Value>(Nan::Undefined());
+        }
+
+        callback->Call(1, argv);
+      }
+    };
+
+  private:
+    FT_STATUS status;
+    FtdiDevice *device;
   };
 
- private:
-  FT_STATUS status;
-  FtdiDevice* device;
-};
-
-NAN_METHOD(FtdiDevice::Close) {
-  Nan::HandleScope scope;
-
-  Nan::Callback *callback = NULL;
-
-  // Obtain Device Object
-  FtdiDevice* device = Nan::ObjectWrap::Unwrap<FtdiDevice>(info.This());
-  if(device == NULL)
+  NAN_METHOD(FtdiDevice::Close)
   {
-    return Nan::ThrowError("No FtdiDevice object found in Java Script object");
-  }
+    Nan::HandleScope scope;
 
-  // Check the device state
-  if(device->deviceState != DeviceState_Open)
-  {
-    // callback
-    if(info[0]->IsFunction())
+    Nan::Callback *callback = NULL;
+
+    // Obtain Device Object
+    FtdiDevice *device = Nan::ObjectWrap::Unwrap<FtdiDevice>(info.This());
+    if (device == NULL)
     {
-      Local<Value> argv[1];
-      argv[0] = Nan::New<String>(FT_STATUS_CUSTOM_ALREADY_CLOSING).ToLocalChecked();
-      callback = new Nan::Callback(info[0].As<v8::Function>());
-      callback->Call(1, argv);
-    }
-  }
-  else
-  {
-    // Set Device State
-    device->deviceState = DeviceState_Closing;
-
-     // callback
-    if(info[0]->IsFunction())
-    {
-      callback = new Nan::Callback(info[0].As<v8::Function>());
+      return Nan::ThrowError("No FtdiDevice object found in Java Script object");
     }
 
-    Nan::AsyncQueueWorker(new CloseWorker(callback, device));
+    // Check the device state
+    if (device->deviceState != DeviceState_Open)
+    {
+      // callback
+      if (info[0]->IsFunction())
+      {
+        Local<Value> argv[1];
+        argv[0] = Nan::New<String>(FT_STATUS_CUSTOM_ALREADY_CLOSING).ToLocalChecked();
+        callback = new Nan::Callback(info[0].As<v8::Function>());
+        callback->Call(1, argv);
+      }
+    }
+    else
+    {
+      // Set Device State
+      device->deviceState = DeviceState_Closing;
+
+      // callback
+      if (info[0]->IsFunction())
+      {
+        callback = new Nan::Callback(info[0].As<v8::Function>());
+      }
+
+      Nan::AsyncQueueWorker(new CloseWorker(callback, device));
+    }
+
+    return;
   }
 
-  return;
-}
+  FT_STATUS FtdiDevice::CloseAsync(FtdiDevice * device)
+  {
+    FT_STATUS ftStatus;
 
-FT_STATUS FtdiDevice::CloseAsync(FtdiDevice* device)
-{
-  FT_STATUS ftStatus;
+    // Send Event for Read Loop
+    device->SignalCloseEvent();
 
-  // Send Event for Read Loop
-  device->SignalCloseEvent();
+    // Wait till read loop finishes
+    uv_mutex_lock(&device->closeMutex);
+    uv_mutex_unlock(&device->closeMutex);
 
-  // Wait till read loop finishes
-  uv_mutex_lock(&device->closeMutex);
-  uv_mutex_unlock(&device->closeMutex);
+    // Close the device
+    uv_mutex_lock(&libraryMutex);
+    ftStatus = FT_Close(device->ftHandle);
+    uv_mutex_unlock(&libraryMutex);
 
-  // Close the device
-  uv_mutex_lock(&libraryMutex);
-  ftStatus = FT_Close(device->ftHandle);
-  uv_mutex_unlock(&libraryMutex);
+    return ftStatus;
+  }
 
-  return ftStatus;
-}
-
-
-/*****************************
+  /*****************************
  * Helper Section
  *****************************/
-FT_STATUS FtdiDevice::SetDeviceSettings()
-{
-  FT_STATUS ftStatus;
-
-  uv_mutex_lock(&libraryMutex);
-  ftStatus = FT_SetDataCharacteristics(ftHandle, deviceParams.wordLength, deviceParams.stopBits, deviceParams.parity);
-  uv_mutex_unlock(&libraryMutex);
-  if (ftStatus != FT_OK)
+  FT_STATUS FtdiDevice::SetDeviceSettings()
   {
-    fprintf(stderr, "Can't Set FT_SetDataCharacteristics: %s\n", error_strings[ftStatus]);
-    return ftStatus;
-  }
+    FT_STATUS ftStatus;
 
-  uv_mutex_lock(&libraryMutex);
-  ftStatus = FT_SetBaudRate(ftHandle, deviceParams.baudRate);
-  uv_mutex_unlock(&libraryMutex);
-  if (ftStatus != FT_OK)
-  {
-    fprintf(stderr, "Can't setBaudRate: %s\n", error_strings[ftStatus]);
-    return ftStatus;
-  }
-
-  if (deviceParams.hasBitSettings == true) {
     uv_mutex_lock(&libraryMutex);
-    ftStatus = FT_SetBitMode(ftHandle, deviceParams.bitMask, deviceParams.bitMode);
+    ftStatus = FT_SetDataCharacteristics(ftHandle, deviceParams.wordLength, deviceParams.stopBits, deviceParams.parity);
     uv_mutex_unlock(&libraryMutex);
     if (ftStatus != FT_OK)
     {
-      fprintf(stderr, "Can't setBitMode: %s\n", error_strings[ftStatus]);
+      fprintf(stderr, "Can't Set FT_SetDataCharacteristics: %s\n", error_strings[ftStatus]);
       return ftStatus;
     }
+
+    uv_mutex_lock(&libraryMutex);
+    ftStatus = FT_SetBaudRate(ftHandle, deviceParams.baudRate);
+    uv_mutex_unlock(&libraryMutex);
+    if (ftStatus != FT_OK)
+    {
+      fprintf(stderr, "Can't setBaudRate: %s\n", error_strings[ftStatus]);
+      return ftStatus;
+    }
+
+    if (deviceParams.hasBitSettings == true)
+    {
+      uv_mutex_lock(&libraryMutex);
+      ftStatus = FT_SetBitMode(ftHandle, deviceParams.bitMask, deviceParams.bitMode);
+      uv_mutex_unlock(&libraryMutex);
+      if (ftStatus != FT_OK)
+      {
+        fprintf(stderr, "Can't setBitMode: %s\n", error_strings[ftStatus]);
+        return ftStatus;
+      }
+    }
+
+    // printf("Connection Settings set [Baud: %d, DataBits: %d, StopBits: %d, Parity: %d]\r\n", deviceParams.baudRate, deviceParams.wordLength, deviceParams.stopBits, deviceParams.parity);
+    return ftStatus;
   }
 
-  // printf("Connection Settings set [Baud: %d, DataBits: %d, StopBits: %d, Parity: %d]\r\n", deviceParams.baudRate, deviceParams.wordLength, deviceParams.stopBits, deviceParams.parity);
-  return ftStatus;
-}
+  void FtdiDevice::ExtractDeviceSettings(Local<Object> options)
+  {
+    Nan::EscapableHandleScope scope;
+    Local<String> baudrate = Nan::New<String>(CONNECTION_BAUDRATE_TAG).ToLocalChecked();
+    Local<String> databits = Nan::New<String>(CONNECTION_DATABITS_TAG).ToLocalChecked();
+    Local<String> stopbits = Nan::New<String>(CONNECTION_STOPBITS_TAG).ToLocalChecked();
+    Local<String> parity = Nan::New<String>(CONNECTION_PARITY_TAG).ToLocalChecked();
+    Local<String> bitmode = Nan::New<String>(CONNECTION_BITMODE).ToLocalChecked();
+    Local<String> bitmask = Nan::New<String>(CONNECTION_BITMASK).ToLocalChecked();
 
-void FtdiDevice::ExtractDeviceSettings(Local<Object> options)
-{
-  Nan::EscapableHandleScope scope;
-  Local<String> baudrate  = Nan::New<String>(CONNECTION_BAUDRATE_TAG).ToLocalChecked();
-  Local<String> databits  = Nan::New<String>(CONNECTION_DATABITS_TAG).ToLocalChecked();
-  Local<String> stopbits  = Nan::New<String>(CONNECTION_STOPBITS_TAG).ToLocalChecked();
-  Local<String> parity    = Nan::New<String>(CONNECTION_PARITY_TAG).ToLocalChecked();
-  Local<String> bitmode   = Nan::New<String>(CONNECTION_BITMODE).ToLocalChecked();
-  Local<String> bitmask   = Nan::New<String>(CONNECTION_BITMASK).ToLocalChecked();
+    if (options->Has(baudrate))
+    {
 
-  if(options->Has(baudrate))
-  {
+      deviceParams.baudRate = options->Get(baudrate)->ToInt32(Nan::GetCurrentContext()).ToLocalChecked()->Value();
+    }
+    if (options->Has(databits))
+    {
+      deviceParams.wordLength = GetWordLength(options->Get(databits)->ToInt32(Nan::GetCurrentContext()).ToLocalChecked()->Value());
+    }
+    if (options->Has(stopbits))
+    {
+      deviceParams.stopBits = GetStopBits(options->Get(stopbits)->ToInt32(Nan::GetCurrentContext()).ToLocalChecked()->Value());
+    }
+    if (options->Has(parity))
+    {
+      char *str;
+      ToCString(options->Get(parity)->ToString(), &str);
+      deviceParams.parity = GetParity(str);
+      delete[] str;
+    }
+    bool hasBitSettings = false;
+    deviceParams.bitMode = 0;
+    deviceParams.bitMask = 0;
 
-    deviceParams.baudRate = options->Get(baudrate)->ToInt32(Nan::GetCurrentContext()).ToLocalChecked()->Value();
-  }
-  if(options->Has(databits))
-  {
-    deviceParams.wordLength = GetWordLength(options->Get(databits)->ToInt32(Nan::GetCurrentContext()).ToLocalChecked()->Value());
-  }
-  if(options->Has(stopbits))
-  {
-    deviceParams.stopBits = GetStopBits(options->Get(stopbits)->ToInt32(Nan::GetCurrentContext()).ToLocalChecked()->Value());
-  }
-  if(options->Has(parity))
-  {
-    char* str;
-    ToCString(options->Get(parity)->ToString(), &str);
-    deviceParams.parity = GetParity(str);
-    delete[] str;
-  }
-  bool hasBitSettings = false;
-  deviceParams.bitMode = 0;
-  deviceParams.bitMask = 0;
-
-  if(options->Has(bitmode))
-  {
-    // int32_t arg = info[0]->ToInt32(Nan::GetCurrentContext()).ToLocalChecked()->Value();
-    // deviceParams.bitMode = options->Get(bitmode)->ToInt32()->Int32Value();
-    deviceParams.bitMode = options->Get(bitmode)->ToInt32(Nan::GetCurrentContext()).ToLocalChecked()->Value();
-    hasBitSettings = true;
-  } else {
+    if (options->Has(bitmode))
+    {
+      // int32_t arg = info[0]->ToInt32(Nan::GetCurrentContext()).ToLocalChecked()->Value();
+      // deviceParams.bitMode = options->Get(bitmode)->ToInt32()->Int32Value();
+      deviceParams.bitMode = options->Get(bitmode)->ToInt32(Nan::GetCurrentContext()).ToLocalChecked()->Value();
+      hasBitSettings = true;
+    } else {
       hasBitSettings = false;
   }
 
@@ -965,6 +1263,8 @@ void FtdiDevice::Initialize(v8::Handle<v8::Object> target)
   tpl->PrototypeTemplate()->Set(Nan::New<String>(JS_WRITE_FUNCTION).ToLocalChecked(), Nan::New<FunctionTemplate>(Write));
   tpl->PrototypeTemplate()->Set(Nan::New<String>(JS_OPEN_FUNCTION).ToLocalChecked(), Nan::New<FunctionTemplate>(Open));
   tpl->PrototypeTemplate()->Set(Nan::New<String>(JS_CLOSE_FUNCTION).ToLocalChecked(), Nan::New<FunctionTemplate>(Close));
+  tpl->PrototypeTemplate()->Set(Nan::New<String>(JS_BIT_MODE_FUNCTION).ToLocalChecked(), Nan::New<FunctionTemplate>(SetBitMode));
+  tpl->PrototypeTemplate()->Set(Nan::New<String>(JS_INIT_MPSSE_FUNCTION).ToLocalChecked(), Nan::New<FunctionTemplate>(InitMpsse));
 
   Local<Function> constructor = tpl->GetFunction();
   target->Set(Nan::New<String>(JS_CLASS_NAME).ToLocalChecked(), constructor);

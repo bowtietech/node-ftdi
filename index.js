@@ -78,6 +78,49 @@ FtdiDevice.prototype.open = function(settings, callback) {
     if (callback) { callback(err); }
   });
 };
+/**
+ * The init MPSSE mechanism.
+ * @param  {Array || Buffer} data     The data, that should be sent to MPSSE.
+ * On error 'error' will be emitted and the callback will be called.
+ * @param  {Function}        callback The function, that will be called when data is sent. [optional]
+ *                                    `function(err){}`
+ */
+FtdiDevice.prototype.initMpsse = function (data, callback) {
+  if (!Buffer.isBuffer(data)) {
+    data = new Buffer(data);
+  }
+  var self = this;
+  this.FTDIDevice.initMpsse(data, function (err) {
+    if (err) {
+      self.emit('error', err);
+    }
+    if (callback) {
+      callback(err);
+    }
+  });
+};
+
+/**
+ * The bitMode mechanism.
+ * @param  {Array || Buffer} data     The data, that should be sent to bitMode.
+ * On error 'error' will be emitted and the callback will be called.
+ * @param  {Function}        callback The function, that will be called when data is sent. [optional]
+ *                                    `function(err){}`
+ */
+FtdiDevice.prototype.bitMode = function (data, callback) {
+  if (!Buffer.isBuffer(data)) {
+    data = new Buffer(data);
+  }
+  var self = this;
+  this.FTDIDevice.bitMode(data, function (err) {
+    if (err) {
+      self.emit('error', err);
+    }
+    if (callback) {
+      callback(err);
+    }
+  });
+};
 
 /**
  * The write mechanism.
@@ -86,16 +129,18 @@ FtdiDevice.prototype.open = function(settings, callback) {
  * @param  {Function}        callback The function, that will be called when data is sent. [optional]
  *                                    `function(err){}`
  */
-FtdiDevice.prototype.write = function(data, callback) {
+FtdiDevice.prototype.write = function (data, callback) {
   if (!Buffer.isBuffer(data)) {
     data = new Buffer(data);
   }
   var self = this;
-  this.FTDIDevice.write(data, function(err) {
+  this.FTDIDevice.write(data, function (err) {
     if (err) {
       self.emit('error', err);
     }
-    if (callback) { callback(err); }
+    if (callback) {
+      callback(err);
+    }
   });
 };
 

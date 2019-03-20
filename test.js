@@ -20,13 +20,25 @@ let mSpiConfig_CLK = [
 ]
 let mSpiConfig_GPIO_0 = [
     0x80, // Select low data bits
-    0xC9, // Set the initial state
-    0xFB // Set the directionality
+    0x08, // Set the initial state
+    0x0B // Set the directionality
 ]
 let mSpiConfig_GPIO_1 = [
     0x82, // Select high data bits
     0x00, // Set the initial state
     0x00 // Set the directionality
+]
+
+let mCsEnable = [
+    0x80,
+    0x00,
+    0x0b
+];
+
+let mCsDisable = [
+    0x80,
+    0x08,
+    0x0b
 ]
 
 let mSpiTestMessage = [
@@ -46,8 +58,15 @@ let mSpiTestMessage = [
 console.log("Device Test:");
 let device = null;
 
-function configDevice() {
-
+function csDisable(device) {
+    device.write(mCsDisable, (err) => {
+        console.log(err);
+    })
+}
+function csEnable(device) {
+    device.write(mCsEnable, (err) => {
+        console.log(err);
+    })
 }
 
 
@@ -164,6 +183,7 @@ ftdi.find(0x6014, 0x0403, function (err, devices, test) {
             const CMD_DISABLE_LOOPBACK = 0x85;
             setTimeout(() => {
                 device.write([CMD_DISABLE_LOOPBACK], function (err) {
+
                     console.log("Disabled Loopback");
                     if (err) {
 
@@ -208,8 +228,10 @@ ftdi.find(0x6014, 0x0403, function (err, devices, test) {
                 });
             }, 1200);
             setTimeout(() => {
+                csEnable(device);
                 device.write(mSpiTestMessage, function (err) {
                     console.log("Wrote SPI Test Message");
+                    csDisable(device);
                     if (err) {
 
                     } else {}

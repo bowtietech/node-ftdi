@@ -3,6 +3,15 @@
 #include <string.h>
 #include <iostream>
 
+
+
+#ifndef _WINDOWS_H
+#define _WINDOWS_H
+#pragma once
+#define _WINSOCKAPI_
+#include <windows.h>
+#endif
+
 #include "ftdi_driver.h"
 #include "ftdi_constants.h"
 

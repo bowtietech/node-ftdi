@@ -37,7 +37,6 @@ kernel & user mode
 
 --*/
 
-
 #ifndef FTD2XX_H
 #define FTD2XX_H
 
@@ -54,7 +53,6 @@ kernel & user mode
 #else
 #define FTD2XX_API __declspec(dllimport)
 #endif
-
 
 typedef PVOID	FT_HANDLE;
 typedef ULONG	FT_STATUS;

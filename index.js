@@ -1,9 +1,10 @@
 var util = require('util'),
     EventEmitter = require('events').EventEmitter,
+    // ftdi = require('./build/Release/ftdi.node'),
     ftdi = require('bindings')('ftdi.node'),
     FTDIDriver = ftdi.FtdiDriver,
     FTDIDevice = ftdi.FtdiDevice;
-
+    
 /**
  * 0x00 = Reset
  * 0x01 = Asynchronous Bit Bang

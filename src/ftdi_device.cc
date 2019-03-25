@@ -7,16 +7,24 @@
 #include <uv.h>
 #include <node_buffer.h>
 
+// #ifndef WIN32
+    // #include <unistd.h>
+    // #include <sys/time.h>
+// #else
+    // #include <windows.h>
+// #endif
+
+// #ifndef _WINDOWS_H
+// #define _WINDOWS_H
+// #include <windows.h>
+// #endif
+
+
 #include "ftdi_constants.h"
 #include "ftdi_device.h"
 #include "ftdi_driver.h"
 
-#ifndef WIN32
-    #include <unistd.h>
-    #include <sys/time.h>
-#else
-    #include <windows.h>
-#endif
+
 
 using namespace std;
 using namespace v8;
@@ -190,7 +198,7 @@ class ReadWorker : public Nan::AsyncWorker {
 
       Local<Object> globalObj = Nan::GetCurrentContext()->Global();
       Local<Function> bufferConstructor = Local<Function>::Cast(globalObj->Get(Nan::New<String>("Buffer").ToLocalChecked()));
-      Handle<Value> constructorArgs[3] = { slowBuffer, Nan::New<Integer>(baton->length), Nan::New<Integer>(0) };
+      Handle<Value> constructorArgs[3] = { slowBuffer, Nan::New<Integer>((uint32_t)baton->length), Nan::New<Integer>((uint32_t)0) };
       Local<Object> actualBuffer = bufferConstructor->NewInstance(Nan::GetCurrentContext(), 3, constructorArgs).ToLocalChecked();
 
       argv[2] = Local<Value>(Nan::New<String>("My SPI").ToLocalChecked());

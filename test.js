@@ -50,6 +50,121 @@ let mSpiTestMessage = [
     0xCC, // Data 1
     0x55,
     0x55
+];
+
+// F(ref) = 10 MHz @ 7dBm into 50 ohm
+// 
+
+
+// N = 2556; = 0x9fc
+// R = 1; = 0x01
+// O = 6; = 0x06
+let mSpiPll0Init = [
+    0x10, // [Confirmed] Output on rising clock, no input
+    0x0a, // [Confirmed] Length Low (Value = length - 1)
+    0x00, // [Confirmed] Length High
+    0x02, // [Confirmed] Addr 0 - Reg 1 (1 << 1)
+
+    // Trigger Stat Pin on Flags 
+    // | x | x | UNLOCK | ALCHI | ALCLO | LOCK | THI | TLO |
+    // | 0 | 0 |   1    |   1   |   1   |  0   |  1  |  1  |
+    0x3B, // Reg 1 Value - Trigger Stat Pin on Flags
+
+    // System Control
+    // | PDALL | PDPLL | PDVCO | PDOUT | PDREF0 | MTCAL | OMUTE | POR |
+    // |   0   |   0   |   0   |   0   |    1   |   0   |   1   |  0  |
+    0x0a, // Reg 2 Value - System Control
+    
+    // BD, R, & N Settings
+    0x00, // [Check BD, R Confirmed] Reg 3 Value - BD[3:0] .. R[9:8]
+    0x01, // [Confirmed] Reg 4 Value - R[7:0]
+    0x09, // [Confirmed] Reg 5 Value - N[15:8]
+    0xfc, // [Confirmed] Reg 6 Value - N[7:0]
+
+    // VCO ALC and Calibration Programming
+    // | ALCEN | ALCMON | ALCCAL | ALCULOK | x | x | CAL | LKEN |
+    // |   0   |    1   |    1   |    0    | 0 | 0 |  1  |   1  |
+    0x63, // Reg 7 Value - VCO ALC and Calibration Programming
+
+    // Reference Input Settings and Output Divider Programming
+    // 10 MHz Reference Clock
+    // | BST | FILT[1:0] | RFO[1:0] | OD[2:1] |
+    // |  0  |    1 1    |   1  1   |  1 1 0  |
+    0x7e, // Reg 8 Value - Reference Input Settings and Output Divider Programming
+
+    // Lock Detect and Charge Pump Current Programming
+    // | LKWIN[1] | LKWIN[0] | LKCT[1] | LKCT[0] | CP[3] | CP[2] | CP[1] | CP[0] |
+    // |     1    |     1    |    0    |    1    |   1   |   0   |   1   |   1   |
+    0xDB, // Reg 9 Value - (Confirm Phase) Lock Detect and Charge Pump Current Programming
+
+    //  Charge Pump Function Programming
+    // | CPCHI | CPCLO | CPMID | CPINV | CPWIDE | CPRST | CPUP | CPDN |
+    // |   1   |   1   |   0   |   0   |    0   |   0   |   0  |   0  |
+    0xC0 // Reg A Value - [Confirmed] Charge Pump Function Programming
+];
+
+// N = 5267; = 0x1493
+// R = 10; = 0x0A
+// O = 1; = 0x01
+let mSpiPll1Init = [
+    0x10, // [Confirmed] Output on rising clock, no input
+    0x0a, // [Confirmed] Length Low (Value = length - 1)
+    0x00, // [Confirmed] Length High
+    0x02, // [Confirmed] Addr 0 - Reg 2 (2 << 1)
+
+    // Trigger Stat Pin on Flags 
+    // | x | x | UNLOCK | ALCHI | ALCLO | LOCK | THI | TLO |
+    // | 0 | 0 |   1    |   1   |   1   |  0   |  1  |  1  |
+    0x3B, // Reg 1 Value - Trigger Stat Pin on Flags
+
+    // System Control
+    // | PDALL | PDPLL | PDVCO | PDOUT | PDREF0 | MTCAL | OMUTE | POR |
+    // |   0   |   0   |   0   |   0   |    1   |   0   |   1   |  0  |
+    0x0a, // Reg 2 Value - System Control
+
+
+    // BD, R, & N Settings
+    0x00, // [Check BD, R Confirmed] Reg 3 Value - BD[3:0] .. R[9:8]
+    0x0a, // Reg 4 Value - R[7:0]
+    0x14, // Reg 5 Value - N[15:8]
+    0x93, // Reg 6 Value - N[7:0]
+
+    // VCO ALC and Calibration Programming
+    // | ALCEN | ALCMON | ALCCAL | ALCULOK | x | x | CAL | LKEN |
+    // |   0   |    1   |    1   |    0    | 0 | 0 |  1  |   1  |
+    0x63, // Reg 7 Value - VCO ALC and Calibration Programming
+
+    // Reference Input Settings and Output Divider Programming
+    // 10 MHz Reference Clock
+    // | BST | FILT[1:0] | RFO[1:0] | OD[2:1] |
+    // |  0  |    1 1    |   0  1   |  0 0 1  |
+    0x7e, // Reg 8 Value - Reference Input Settings and Output Divider Programming
+
+    // Lock Detect and Charge Pump Current Programming
+    // | LKWIN[1] | LKWIN[0] | LKCT[1] | LKCT[0] | CP[3] | CP[2] | CP[1] | CP[0] |
+    // |     1    |     1    |    0    |    1    |   1   |   0   |   1   |   1   |
+    0xDB, // Reg 9 Value - (Confirm Phase) Lock Detect and Charge Pump Current Programming
+
+    //  Charge Pump Function Programming
+    // | CPCHI | CPCLO | CPMID | CPINV | CPWIDE | CPRST | CPUP | CPDN |
+    // |   1   |   1   |   0   |   0   |    0   |   0   |   0  |   0  |
+    0xC0 // Reg A Value - [Confirmed] Charge Pump Function Programming
+];
+
+let mSpiPllUnmute = [
+    0x10, // Output on rising clock, no input
+    0x01, // Length Low (Value = length - 1)
+    0x00, // Length High
+    0x06, // Addr 0 - Reg 2 (2 << 1)
+    0x08, // Unmute PLL
+];
+
+let mSpiPllReadStat = [
+    0x30, // Read/write
+    0x01, // Length Low (Value = length - 1)
+    0x00, // Length High
+    0x00, // Addr 0 
+    0x55  // Don't Care Data
 ]
 
 // DWORD dwClockDivisor = 0x05DB;
@@ -114,65 +229,65 @@ ftdi.find(0x6014, 0x0403, function (err, devices, test) {
                 console.log('Received');
                 console.log(data);
 
-                switch (state) {
-                    case STATE_LOOPBACK_TEST:
-                        if (data[0] == 0xfa && data[1] == CMD_DISABLE_LOOPBACK) {
-                            +state++;
-                            device.write([CMD_DISABLE_LOOPBACK], function (err) {
-                                // setTimeout(()=>{
-                                //     device.write([CMD_DISABLE_LOOPBACK], function (err) {});},500);
-                                // return;
-                                console.log("Loopback worked")
-                                if (err) {
-                                    console.log(err);
-                                } else {
-                                    // device.bitMode([
-                                    //         0x0,
-                                    //         0x0
-                                    //     ],
-                                    //     function (err) {
-                                    //         console.log(err);
-                                    //         return;
-                                    setTimeout(() => {
-                                        console.log("Sending GPIO Config");
-                                        console.log(device);
-                                        device.write(mSpiConfig_GPIO_0, (err) => {
-                                            console.log("GPIO Config Sent");
-                                            // setTimeout(() => {
+                // switch (state) {
+                //     case STATE_LOOPBACK_TEST:
+                //         if (data[0] == 0xfa && data[1] == CMD_DISABLE_LOOPBACK) {
+                //             +state++;
+                //             device.write([CMD_DISABLE_LOOPBACK], function (err) {
+                //                 // setTimeout(()=>{
+                //                 //     device.write([CMD_DISABLE_LOOPBACK], function (err) {});},500);
+                //                 // return;
+                //                 console.log("Loopback worked")
+                //                 if (err) {
+                //                     console.log(err);
+                //                 } else {
+                //                     // device.bitMode([
+                //                     //         0x0,
+                //                     //         0x0
+                //                     //     ],
+                //                     //     function (err) {
+                //                     //         console.log(err);
+                //                     //         return;
+                //                     setTimeout(() => {
+                //                         console.log("Sending GPIO Config");
+                //                         console.log(device);
+                //                         device.write(mSpiConfig_GPIO_0, (err) => {
+                //                             console.log("GPIO Config Sent");
+                //                             // setTimeout(() => {
 
-                                            //     device.open({
-                                            //             baudrate: 250000,
-                                            //             databits: 8,
-                                            //             stopbits: 1,
-                                            //             parity: 'none',
-                                            //             bitmode: 'mpsse',
-                                            //             bitmask: 0x0
-                                            //         },
-                                            //         function (err) {
-                                            setTimeout(() => {
-                                                console.log("Trying again");
-                                                console.log(device);
-                                                device.write(mSpiTestMessage, (err) => {
-                                                    console.log("Test Message Sent");
-                                                });
-                                            }, 1000);
-                                            //         });
-                                            // }, 1000);
-                                        });
-                                    }, 1000);
-                                    // });
-                                }
-                            });
-                        }
-                        break;
+                //                             //     device.open({
+                //                             //             baudrate: 250000,
+                //                             //             databits: 8,
+                //                             //             stopbits: 1,
+                //                             //             parity: 'none',
+                //                             //             bitmode: 'mpsse',
+                //                             //             bitmask: 0x0
+                //                             //         },
+                //                             //         function (err) {
+                //                             setTimeout(() => {
+                //                                 console.log("Trying again");
+                //                                 console.log(device);
+                //                                 device.write(mSpiTestMessage, (err) => {
+                //                                     console.log("Test Message Sent");
+                //                                 });
+                //                             }, 1000);
+                //                             //         });
+                //                             // }, 1000);
+                //                         });
+                //                     }, 1000);
+                //                     // });
+                //                 }
+                //             });
+                //         }
+                //         break;
 
-                    case STATE_LOOPBACK_DISABLED:
+                //     case STATE_LOOPBACK_DISABLED:
 
-                        break;
+                //         break;
 
-                    default:
-                        break;
-                }
+                //     default:
+                //         break;
+                // }
 
 
 
@@ -229,15 +344,41 @@ ftdi.find(0x6014, 0x0403, function (err, devices, test) {
             }, 1200);
             setTimeout(() => {
                 csEnable(device);
-                device.write(mSpiTestMessage, function (err) {
-                    console.log("Wrote SPI Test Message");
-                    csDisable(device);
+                device.write(mSpiPll0Init, function (err) {
+                    console.log("Wrote PLL Config Message");
+                    setTimeout(()=>{
+                        csDisable(device);
+                    }, 1);
                     if (err) {
 
                     } else {}
                 });
-            }, 1200);
+            }, 1300);
+            setTimeout(() => {
+                csEnable(device);
+                device.write(mSpiPllUnmute, function (err) {
+                    console.log("Wrote PLL Unmute Message");
+                    setTimeout(() => {
+                        csDisable(device);
+                    }, 1);
+                    if (err) {
 
+                    } else {}
+                });
+            }, 1400);
+
+            setTimeout(() => {
+                csEnable(device);
+                device.write(mSpiPllReadStat, function (err) {
+                    console.log("Request Read PLL Status Message (get in callback)");
+                    setTimeout(() => {
+                        csDisable(device);
+                    }, 10);
+                    if (err) {
+
+                    } else {}
+                });
+            }, 1500);
 
         });
 });

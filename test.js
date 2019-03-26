@@ -208,7 +208,7 @@ ftdi.find(0x6014, 0x0403, function (err, devices, test) {
         return;
     }
 
-    return;
+    // return;
 
     device.open({
             baudrate: 250000,
@@ -228,70 +228,10 @@ ftdi.find(0x6014, 0x0403, function (err, devices, test) {
             device.on('data', function (data) {
                 console.log('Received');
                 console.log(data);
-
-                // switch (state) {
-                //     case STATE_LOOPBACK_TEST:
-                //         if (data[0] == 0xfa && data[1] == CMD_DISABLE_LOOPBACK) {
-                //             +state++;
-                //             device.write([CMD_DISABLE_LOOPBACK], function (err) {
-                //                 // setTimeout(()=>{
-                //                 //     device.write([CMD_DISABLE_LOOPBACK], function (err) {});},500);
-                //                 // return;
-                //                 console.log("Loopback worked")
-                //                 if (err) {
-                //                     console.log(err);
-                //                 } else {
-                //                     // device.bitMode([
-                //                     //         0x0,
-                //                     //         0x0
-                //                     //     ],
-                //                     //     function (err) {
-                //                     //         console.log(err);
-                //                     //         return;
-                //                     setTimeout(() => {
-                //                         console.log("Sending GPIO Config");
-                //                         console.log(device);
-                //                         device.write(mSpiConfig_GPIO_0, (err) => {
-                //                             console.log("GPIO Config Sent");
-                //                             // setTimeout(() => {
-
-                //                             //     device.open({
-                //                             //             baudrate: 250000,
-                //                             //             databits: 8,
-                //                             //             stopbits: 1,
-                //                             //             parity: 'none',
-                //                             //             bitmode: 'mpsse',
-                //                             //             bitmask: 0x0
-                //                             //         },
-                //                             //         function (err) {
-                //                             setTimeout(() => {
-                //                                 console.log("Trying again");
-                //                                 console.log(device);
-                //                                 device.write(mSpiTestMessage, (err) => {
-                //                                     console.log("Test Message Sent");
-                //                                 });
-                //                             }, 1000);
-                //                             //         });
-                //                             // }, 1000);
-                //                         });
-                //                     }, 1000);
-                //                     // });
-                //                 }
-                //             });
-                //         }
-                //         break;
-
-                //     case STATE_LOOPBACK_DISABLED:
-
-                //         break;
-
-                //     default:
-                //         break;
-                // }
-
-
-
             });
+
+
+            return;
 
             // Initialize MPSSE loopback for testing
             const CMD_READBACK_TEST = 0xAB;

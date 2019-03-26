@@ -215,6 +215,7 @@ ftdi.find(0x6014, 0x0403, function (err, devices, test) {
             baudrate: 250000,
             databits: 8,
             stopbits: 1,
+            flags: 0x1,
             parity: 'none',
             bitmode: 'mpsse',
             bitmask: 0x0

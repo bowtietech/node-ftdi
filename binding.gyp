@@ -46,7 +46,7 @@
           {
             'include_dirs+': [
               '/usr/local/include',
-              'lib/MPSSE/',
+              # 'lib/MPSSE/',
               # '/usr/local/include/libftd2xx/'
             ],
             'ldflags': [
@@ -55,7 +55,7 @@
             'link_settings': {
               'libraries': [
                 '-lftd2xx',
-                '<(module_root_dir)/lib/MPSSE/libMPSSE.so'
+                # '<(module_root_dir)/lib/MPSSE/libMPSSE.so'
               ]
             }
           }

@@ -195,10 +195,8 @@ ftdi.find(0x6014, 0x0403, function (err, devices, test) {
     console.log("FTDI Test: ");
     console.log(test);
 
-
     try {
         device = new ftdi.FtdiDevice(0); // index in list function
-
 
         device.on('error', function (err) {
             console.log('Device Error');
@@ -208,8 +206,6 @@ ftdi.find(0x6014, 0x0403, function (err, devices, test) {
         console.log('No device connected');
         return;
     }
-
-
 
     device.open({
             baudrate: 250000,

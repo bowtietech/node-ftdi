@@ -20,7 +20,7 @@ let mSpiConfig_CLK = [
 ]
 let mSpiConfig_GPIO_0 = [
     0x80, // Select low data bits
-    0x08, // Set the initial state
+    0x09, // Set the initial state
     0x0B // Set the directionality
 ]
 let mSpiConfig_GPIO_1 = [
@@ -37,7 +37,7 @@ let mCsEnable = [
 
 let mCsDisable = [
     0x80,
-    0x08,
+    0x09,
     0x0b
 ]
 
@@ -60,7 +60,7 @@ let mSpiTestMessage = [
 // R = 1; = 0x01
 // O = 6; = 0x06
 let mSpiPll0Init = [
-    0x10, // [Confirmed] Output on rising clock, no input
+    0x11, // [Confirmed] Output on rising clock, no input
     0x0a, // [Confirmed] Length Low (Value = length - 1)
     0x00, // [Confirmed] Length High
     0x02, // [Confirmed] Addr 0 - Reg 1 (1 << 1)
@@ -160,10 +160,10 @@ let mSpiPllUnmute = [
 ];
 
 let mSpiPllReadStat = [
-    0x30, // Read/write
+    0x31, // Read/write
     0x01, // Length Low (Value = length - 1)
     0x00, // Length High
-    0x00, // Addr 0 
+    0x01, // Addr 0 
     0x55  // Don't Care Data
 ]
 
@@ -213,7 +213,7 @@ ftdi.find(0x6014, 0x0403, function (err, devices, test) {
     device.open({
             baudrate: 250000,
             databits: 8,
-            stopbits: 1,
+            stopbits: 0,
             flags: 0x1,
             parity: 'none',
             bitmode: 'mpsse',

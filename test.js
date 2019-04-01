@@ -175,12 +175,12 @@ let device = null;
 
 function csDisable(device) {
     device.write(mCsDisable, (err) => {
-        console.log(err);
+        // console.log(err);
     })
 }
 function csEnable(device) {
     device.write(mCsEnable, (err) => {
-        console.log(err);
+        // console.log(err);
     })
 }
 
@@ -226,12 +226,14 @@ ftdi.find(0x6014, 0x0403, function (err, devices, test) {
             }
 
             device.on('data', function (data) {
+                csDisable(device);
                 console.log('Received');
                 console.log(data);
+
             });
 
 
-            return;
+            // return;
 
             // Initialize MPSSE loopback for testing
             const CMD_READBACK_TEST = 0xAB;
@@ -312,7 +314,7 @@ ftdi.find(0x6014, 0x0403, function (err, devices, test) {
                 device.write(mSpiPllReadStat, function (err) {
                     console.log("Request Read PLL Status Message (get in callback)");
                     setTimeout(() => {
-                        csDisable(device);
+                        // csDisable(device);
                     }, 10);
                     if (err) {
 
